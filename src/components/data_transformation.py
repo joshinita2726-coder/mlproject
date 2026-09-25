@@ -1,6 +1,6 @@
 import sys
 import os
-import pickle
+
 from dataclasses import dataclass
 
 import numpy as np
@@ -13,13 +13,15 @@ from sklearn.preprocessing import OneHotEncoder, StandardScaler
 
 from src.exception import CustomException
 from src.logger import logging
+from src.utils import save_object
 
 
 @dataclass
 class DataTransformationConfig:
+
     preprocessor_obj_file_path = os.path.join(
-        'artifacts',
-        'preprocessor.pkl'
+        "artifacts",
+        "preprocessor.pkl"
     )
 
 
@@ -29,16 +31,20 @@ class DataTransformation:
         self.data_transformation_config = DataTransformationConfig()
 
     def get_data_transformer_object(self):
+
         """
         This function is responsible for data transformation.
         """
 
         try:
+
+            # Numerical columns
             numerical_columns = [
-                'writing_score',
-                'reading_score'
+                "writing_score",
+                "reading_score"
             ]
 
+            # Categorical columns
             categorical_columns = [
                 "gender",
                 "race_ethnicity",
@@ -50,8 +56,14 @@ class DataTransformation:
             # Numerical pipeline
             num_pipeline = Pipeline(
                 steps=[
-                    ("imputer", SimpleImputer(strategy="median")),
-                    ("scaler", StandardScaler())
+                    (
+                        "imputer",
+                        SimpleImputer(strategy="median")
+                    ),
+                    (
+                        "scaler",
+                        StandardScaler()
+                    )
                 ]
             )
 
@@ -60,11 +72,21 @@ class DataTransformation:
                 steps=[
                     (
                         "imputer",
-                        SimpleImputer(strategy="most_frequent")
+                        SimpleImputer(
+                            strategy="most_frequent"
+                        )
                     ),
                     (
                         "one_hot_encoder",
-                        OneHotEncoder(handle_unknown='ignore')
+                        OneHotEncoder(
+                            handle_unknown="ignore"
+                        )
+                    ),
+                    (
+                        "scaler",
+                        StandardScaler(
+                            with_mean=False
+                        )
                     )
                 ]
             )
@@ -77,7 +99,7 @@ class DataTransformation:
                 f"Numerical columns: {numerical_columns}"
             )
 
-            # Combine both pipelines
+            # Column transformer
             preprocessor = ColumnTransformer(
                 transformers=[
                     (
@@ -96,11 +118,17 @@ class DataTransformation:
             return preprocessor
 
         except Exception as e:
+
             raise CustomException(e, sys)
 
-    def initiate_data_transformation(self, train_path, test_path):
+    def initiate_data_transformation(
+        self,
+        train_path,
+        test_path
+    ):
 
         try:
+
             # Read train and test data
             train_df = pd.read_csv(train_path)
             test_df = pd.read_csv(test_path)
@@ -109,17 +137,21 @@ class DataTransformation:
                 "Read train and test data completed"
             )
 
-            # Get preprocessing object
             logging.info(
                 "Obtaining preprocessing object"
             )
 
-            preprocessing_obj = self.get_data_transformer_object()
+            preprocessing_obj = (
+                self.get_data_transformer_object()
+            )
 
             # Target column
             target_column_name = "math_score"
 
+            # ------------------------------------------------
             # Separate input features and target
+            # ------------------------------------------------
+
             input_feature_train_df = train_df.drop(
                 columns=[target_column_name]
             )
@@ -138,20 +170,33 @@ class DataTransformation:
 
             logging.info(
                 "Applying preprocessing object on training "
-                "and testing dataframe"
+                "and testing dataframe."
             )
 
+            # ------------------------------------------------
             # Fit and transform training data
-            input_feature_train_arr = preprocessing_obj.fit_transform(
-                input_feature_train_df
+            # ------------------------------------------------
+
+            input_feature_train_arr = (
+                preprocessing_obj.fit_transform(
+                    input_feature_train_df
+                )
             )
 
+            # ------------------------------------------------
             # Transform testing data
-            input_feature_test_arr = preprocessing_obj.transform(
-                input_feature_test_df
+            # ------------------------------------------------
+
+            input_feature_test_arr = (
+                preprocessing_obj.transform(
+                    input_feature_test_df
+                )
             )
 
-            # Combine transformed features with target
+            # ------------------------------------------------
+            # Combine features and target
+            # ------------------------------------------------
+
             train_arr = np.c_[
                 input_feature_train_arr,
                 np.array(target_feature_train_df)
@@ -163,44 +208,28 @@ class DataTransformation:
             ]
 
             logging.info(
-                "Preprocessing completed successfully"
+                "Saved preprocessing object."
             )
 
+            # ------------------------------------------------
             # Save preprocessing object
-            save_object(
-                file_path=self.data_transformation_config.preprocessor_obj_file_path,
-                obj=preprocessing_obj
-            )
+            # ------------------------------------------------
 
-            logging.info(
-                "Saved preprocessing object"
+            save_object(
+                file_path=(
+                    self.data_transformation_config
+                    .preprocessor_obj_file_path
+                ),
+                obj=preprocessing_obj
             )
 
             return (
                 train_arr,
                 test_arr,
-                self.data_transformation_config.preprocessor_obj_file_path
+                self.data_transformation_config
+                .preprocessor_obj_file_path
             )
 
         except Exception as e:
+
             raise CustomException(e, sys)
-
-
-def save_object(file_path, obj):
-    """
-    Save Python object as a pickle file.
-    """
-
-    try:
-        dir_path = os.path.dirname(file_path)
-
-        os.makedirs(
-            dir_path,
-            exist_ok=True
-        )
-
-        with open(file_path, "wb") as file_obj:
-            pickle.dump(obj, file_obj)
-
-    except Exception as e:
-        raise CustomException(e, sys)

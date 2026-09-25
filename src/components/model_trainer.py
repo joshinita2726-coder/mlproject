@@ -8,12 +8,11 @@ from catboost import CatBoostRegressor
 from sklearn.ensemble import (
     AdaBoostRegressor,
     GradientBoostingRegressor,
-    RandomForestRegressor
+    RandomForestRegressor,
 )
 
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import r2_score
-from sklearn.neighbors import KNeighborsRegressor
 from sklearn.tree import DecisionTreeRegressor
 
 from xgboost import XGBRegressor
@@ -39,21 +38,15 @@ class ModelTrainer:
     def initiate_model_trainer(self, train_array, test_array):
 
         try:
+            logging.info("Split training and test input data")
 
-            logging.info(
-                "Splitting training and test input data"
-            )
-
-            # Split input features and target variable
             X_train = train_array[:, :-1]
             y_train = train_array[:, -1]
 
             X_test = test_array[:, :-1]
             y_test = test_array[:, -1]
 
-            # Define models
             models = {
-
                 "Random Forest": RandomForestRegressor(),
 
                 "Decision Tree": DecisionTreeRegressor(),
@@ -62,37 +55,137 @@ class ModelTrainer:
 
                 "Linear Regression": LinearRegression(),
 
-                "K-Neighbors": KNeighborsRegressor(),
+                "XGBRegressor": XGBRegressor(),
 
-                "XGBoost": XGBRegressor(),
+                "CatBoosting Regressor": CatBoostRegressor(
+                    verbose=False
+                ),
 
-                "CatBoosting": CatBoostRegressor(verbose=False),
-
-                "AdaBoost": AdaBoostRegressor()
-
+                "AdaBoost Regressor": AdaBoostRegressor(),
             }
 
-            # Evaluate all models
-            model_report: dict = evaluate_models(
+            params = {
+
+                "Decision Tree": {
+                    "criterion": [
+                        "squared_error",
+                        "absolute_error",
+                        "poisson"
+                    ]
+                },
+
+                "Random Forest": {
+                    "n_estimators": [
+                        8,
+                        16,
+                        32,
+                        64,
+                        128,
+                        256
+                    ]
+                },
+
+                "Gradient Boosting": {
+                    "learning_rate": [
+                        0.1,
+                        0.01,
+                        0.05,
+                        0.001
+                    ],
+
+                    "subsample": [
+                        0.6,
+                        0.7,
+                        0.75,
+                        0.8,
+                        0.85,
+                        0.9
+                    ],
+
+                    "n_estimators": [
+                        8,
+                        16,
+                        32,
+                        64,
+                        128,
+                        256
+                    ]
+                },
+
+                "Linear Regression": {},
+
+                "XGBRegressor": {
+                    "learning_rate": [
+                        0.1,
+                        0.01,
+                        0.05,
+                        0.001
+                    ],
+
+                    "n_estimators": [
+                        8,
+                        16,
+                        32,
+                        64,
+                        128,
+                        256
+                    ]
+                },
+
+                "CatBoosting Regressor": {
+                    "depth": [
+                        6,
+                        8,
+                        10
+                    ],
+
+                    "learning_rate": [
+                        0.01,
+                        0.05,
+                        0.1
+                    ],
+
+                    "iterations": [
+                        30,
+                        50,
+                        100
+                    ]
+                },
+
+                "AdaBoost Regressor": {
+                    "learning_rate": [
+                        0.1,
+                        0.01,
+                        0.5,
+                        0.001
+                    ],
+
+                    "n_estimators": [
+                        8,
+                        16,
+                        32,
+                        64,
+                        128,
+                        256
+                    ]
+                }
+            }
+
+            model_report = evaluate_models(
                 X_train=X_train,
                 y_train=y_train,
                 X_test=X_test,
                 y_test=y_test,
-                models=models
+                models=models,
+                param=params
             )
 
             # Get best model score
-            best_model_score = max(
-                sorted(model_report.values())
-            )
+            best_model_score = max(model_report.values())
 
             # Get best model name
-            best_model_name = list(
-                model_report.keys()
-            )[
-                list(model_report.values()).index(
-                    best_model_score
-                )
+            best_model_name = list(model_report.keys())[
+                list(model_report.values()).index(best_model_score)
             ]
 
             # Get best model
@@ -103,14 +196,12 @@ class ModelTrainer:
             )
 
             logging.info(
-                f"Best model R2 score: {best_model_score}"
+                f"Best model score: {best_model_score}"
             )
 
-            # Check model performance
             if best_model_score < 0.6:
-
                 raise CustomException(
-                    "No best model found with R2 score above 0.6"
+                    "No best model found"
                 )
 
             # Save best model
@@ -119,10 +210,9 @@ class ModelTrainer:
                 obj=best_model
             )
 
-            # Prediction
+            # Final prediction
             predicted = best_model.predict(X_test)
 
-            # R2 score
             r2_square = r2_score(
                 y_test,
                 predicted
@@ -135,5 +225,4 @@ class ModelTrainer:
             return r2_square
 
         except Exception as e:
-
             raise CustomException(e, sys)
